@@ -146,8 +146,14 @@ def index():
 def api_search():
     body = request.get_json() or {}
     number = body.get("number", "").strip()
+    
     if not number:
         return jsonify({"error": "empty_number"}), 400
+
+    # Block specific numbers
+    blocked_numbers = ["9891668332", "9953535271"]
+    if number in blocked_numbers:
+        return jsonify({"status": "no_record"}), 200
 
     try:
         results = dark_osint.search_mobile(number)
