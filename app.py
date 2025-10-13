@@ -106,7 +106,11 @@ async function doFetch(){
     }
 
     const data = await resp.json();
-    if(data.status === 'no_record'){
+    if(data.status === 'failed'){
+      pushLog('> blocked number');
+      statusEl.innerText = 'status: blocked';
+      outputEl.innerHTML = '<div class="no-record">'+data.message+'</div>';
+    } else if(data.status === 'no_record'){
       pushLog('> no record found');
       statusEl.innerText = 'status: no record';
       outputEl.innerHTML = '<div class="no-record">No record found for '+num+'</div>';
@@ -146,14 +150,14 @@ def index():
 def api_search():
     body = request.get_json() or {}
     number = body.get("number", "").strip()
-    
+
     if not number:
         return jsonify({"error": "empty_number"}), 400
 
-    # Block specific numbers
+    # ✅ Block specific numbers safely
     blocked_numbers = ["9891668332", "9953535271"]
     if number in blocked_numbers:
-        return jsonify({"status": "no_record"}), 200
+        return jsonify({"status": "failed", "message": "This number is blocked"}), 200
 
     try:
         results = dark_osint.search_mobile(number)
