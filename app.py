@@ -40,13 +40,11 @@ INDEX_HTML = """
     .meta{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted);}
     .no-record{color:#ff6b6b}
     .ok-record{color:var(--accent)}
-    @media(max-width:768px){html, body{font-size:16px;}.card{padding:16px; gap:12px;}.left, .right{padding:12px;}input[type=text], .btn{font-size:14px; padding:10px 12px;}.console, .output{font-size:13px;}}
-    @media(max-width:480px){html, body{font-size:14px;}.card{padding:12px; gap:10px;}input[type=text], .btn{font-size:13px; padding:8px 10px;}.console, .output{font-size:12px; height:150px;}}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card" role="main" aria-label="OSINT MADE BY GURMAN">
+    <div class="card">
       <div class="left">
         <form id="searchForm" onsubmit="return false;">
           <label for="number">Enter mobile number</label>
@@ -97,16 +95,9 @@ async function doFetch(){
       body: JSON.stringify({ number: num })
     });
 
-    if(!resp.ok){
-      const txt = await resp.text();
-      pushLog('> server error: ' + resp.status + ' ' + txt);
-      statusEl.innerText='status: error';
-      outputEl.innerHTML = '<div class="no-record">Server error: '+resp.status+'</div>';
-      return;
-    }
-
     const data = await resp.json();
-    if(data.status === 'failed'){
+
+    if(data.status === 'blocked'){
       pushLog('> blocked number');
       statusEl.innerText = 'status: blocked';
       outputEl.innerHTML = '<div class="no-record">'+data.message+'</div>';
@@ -118,7 +109,7 @@ async function doFetch(){
       pushLog('> record found');
       statusEl.innerText = 'status: record';
       const pretty = JSON.stringify(data.results, null, 2);
-      outputEl.innerHTML = '<pre>'+ pretty +'</pre>';
+      outputEl.innerHTML = '<pre>'+pretty+'</pre>';
     } else if(data.error){
       pushLog('> backend error: ' + data.error);
       statusEl.innerText = 'status: error';
@@ -126,10 +117,10 @@ async function doFetch(){
     } else {
       pushLog('> unexpected response');
       statusEl.innerText = 'status: unknown';
-      outputEl.innerHTML = '<pre>'+JSON.stringify(data, null,2)+'</pre>';
+      outputEl.innerHTML = '<pre>'+JSON.stringify(data, null, 2)+'</pre>';
     }
   }catch(err){
-    pushLog('> fetch failed: '+ err.message);
+    pushLog('> fetch failed: ' + err.message);
     statusEl.innerText='status: offline';
     outputEl.innerHTML = '<div class="no-record">Network error</div>';
   }
@@ -154,18 +145,22 @@ def api_search():
     if not number:
         return jsonify({"error": "empty_number"}), 400
 
-    # ✅ Block specific numbers safely
+    # ✅ Block specific numbers
     blocked_numbers = ["9891668332", "9953535271"]
     if number in blocked_numbers:
-        return jsonify({"status": "failed", "message": "This number is blocked"}), 200
+        return jsonify({"status": "blocked", "message": "This number is blocked"}), 200
 
     try:
         results = dark_osint.search_mobile(number)
-        if not results:
+
+        if results and isinstance(results, list) and len(results) > 0:
+            return jsonify({"status": "ok", "results": results}), 200
+        else:
             return jsonify({"status": "no_record"}), 200
-        return jsonify({"status": "ok", "results": results}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
